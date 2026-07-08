@@ -1,4 +1,8 @@
-# KiCanvas
+# keycanvas
+
+> **keycanvas** is [KeyLife](https://keylife.tech)'s maintained fork of [KiCanvas], created by [Thea Flowers](https://thea.codes). It tracks upstream KiCanvas and adds a small, host-app integration surface (notably a public [selection-event API](#selection-events)) used by KeyLife's products. All upstream attribution and the original [MIT License](LICENSE.md) are preserved. For build instructions specific to this fork, see [BUILDING.md](BUILDING.md).
+>
+> The public element and bundle names are intentionally unchanged from upstream — `<kicanvas-embed>`, `<kicanvas-source>`, and `kicanvas.js` — so it remains a drop-in replacement.
 
 [KiCanvas] is an **interactive**, **browser-based** viewer for [KiCad] schematics and boards. You can try it out for yourself at https://kicanvas.org.
 
@@ -19,6 +23,30 @@ KiCanvas is developed by [Thea Flowers](https://thea.codes) with financial suppo
 [WebGL]: https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API
 [Thea Flowers]: https://thea.codes
 [sponsors]: https://github.com/sponsors/theacodes
+
+## Selection events
+
+This fork adds a public selection-event API on top of the [embedding API]. When
+the user selects a footprint (board) or a symbol (schematic), the
+`<kicanvas-embed>` element dispatches a bubbling, composed `kicanvas:select`
+`CustomEvent`; when the selection clears it dispatches `kicanvas:deselect`.
+
+```js
+const viewer = document.querySelector("kicanvas-embed");
+
+viewer.addEventListener("kicanvas:select", (e) => {
+    // e.detail: { itemType: "footprint" | "symbol", reference, value,
+    //             fields: Record<string, string>, sheet? }
+    console.log(e.detail.reference, e.detail.fields["MPN"]);
+});
+
+viewer.addEventListener("kicanvas:deselect", () => {
+    console.log("selection cleared");
+});
+```
+
+See the [embedding documentation][embedding API] (`docs/docs/embedding.md`) for
+the full event contract and more examples.
 
 ## Status and roadmap
 

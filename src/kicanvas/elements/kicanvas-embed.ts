@@ -15,6 +15,8 @@ import {
 } from "../../base/web-components";
 import { KCUIElement } from "../../kc-ui";
 import kc_ui_styles from "../../kc-ui/kc-ui.css";
+import { KiCanvasSelectEvent } from "../../viewers/base/events";
+import type { Viewer } from "../../viewers/base/viewer";
 import { Project } from "../project";
 import {
     FetchFileSystem,
@@ -24,6 +26,11 @@ import {
 } from "../services/vfs";
 import type { KCBoardAppElement } from "./kc-board/app";
 import type { KCSchematicAppElement } from "./kc-schematic/app";
+import {
+    build_select_detail,
+    KICANVAS_DESELECT_EVENT,
+    KICANVAS_SELECT_EVENT,
+} from "./select-event";
 
 const log = new Logger("kicanvas:embedtag");
 
@@ -170,9 +177,68 @@ class KiCanvasEmbedElement extends KCUIElement {
             this.loaded = true;
             await this.update();
 
+            this.#setup_selection_events();
+
             this.#project.set_active_page(this.#project.root_schematic_page!);
         } finally {
             this.loading = false;
+        }
+    }
+
+    /**
+     * Subscribe to each viewer's internal selection and re-dispatch the
+     * public `kicanvas:select` / `kicanvas:deselect` events on this element.
+     */
+    #setup_selection_events() {
+        for (const app of [this.#schematic_app, this.#board_app]) {
+            if (app) {
+                this.#watch_app_selection(app);
+            }
+        }
+    }
+
+    async #watch_app_selection(app: {
+        viewerReady: PromiseLike<boolean>;
+        readonly viewer: Viewer;
+    }) {
+        // The viewer is created asynchronously; wait until it's ready.
+        await app.viewerReady;
+
+        const viewer: Viewer = app.viewer;
+
+        this.addDisposable(
+            viewer.addEventListener(KiCanvasSelectEvent.type, (e) => {
+                this.#on_viewer_select(e.detail.item);
+            }),
+        );
+    }
+
+    #on_viewer_select(item: unknown) {
+        // Selection was cleared.
+        if (item === null || item === undefined) {
+            this.dispatchEvent(
+                new CustomEvent(KICANVAS_DESELECT_EVENT, {
+                    bubbles: true,
+                    composed: true,
+                }),
+            );
+            return;
+        }
+
+        const detail = build_select_detail(item, {
+            sheet: this.#project.active_page?.name,
+        });
+
+        // Only footprints and symbols map to a public selection payload;
+        // ignore other selectable items (e.g. sheets, nets).
+        if (detail) {
+            this.dispatchEvent(
+                new CustomEvent(KICANVAS_SELECT_EVENT, {
+                    detail,
+                    bubbles: true,
+                    composed: true,
+                }),
+            );
         }
     }
 
