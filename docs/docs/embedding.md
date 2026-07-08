@@ -166,15 +166,67 @@ This example shows how to use `<kicanvas-source>` along with inline KiCad data. 
 
 ## Events
 
-!!! warning "Not yet implemented"
-
-    This functionality hasn't been implemented yet
-
 | Event Name                  | Fired When                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `kicanvas:select`           | The user selects a footprint (board) or symbol (schematic) within the document.                   |
+| `kicanvas:deselect`         | The current selection is cleared (e.g. the user clicks empty space).                              |
 | ⚠️`kicanvas:click`          | The user clicks or taps within the embedded document                                              |
 | ⚠️`kicanvas:documentchange` | The currently displayed document is changed, either through user interaction or programmatically. |
 | ⚠️`kicanvas:error`          | An error occurs while loading source files                                                        |
 | ⚠️`kicanvas:load`           | All sources files have been successfully loaded                                                   |
 | ⚠️`kicanvas:loadstart`      | KiCanvas begins loading source files                                                              |
-| ⚠️`kicanvas:select`         | The user selects (or deselects) an object within the document                                     |
+
+### Selection events
+
+When the user selects a footprint on a board or a symbol on a schematic, the
+`<kicanvas-embed>` element dispatches a `kicanvas:select` [`CustomEvent`](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent).
+The event bubbles and is `composed`, so it crosses shadow-DOM boundaries and can
+be handled by listening directly on the `<kicanvas-embed>` element (or any
+ancestor). When the selection is cleared, a `kicanvas:deselect` event is
+dispatched instead.
+
+The `kicanvas:select` event's `detail` has the following shape:
+
+```ts
+interface KiCanvasSelectDetail {
+    // "footprint" for board footprints, "symbol" for schematic symbols.
+    itemType: "footprint" | "symbol";
+    // The item's reference designator (e.g. "R1", "U3"), or null.
+    reference: string | null;
+    // The item's value (e.g. "10k", "ATmega328"), or null.
+    value: string | null;
+    // The item's full property/field map, so you can read metadata such as
+    // MPN, Manufacturer, or Datasheet.
+    fields: Record<string, string>;
+    // The sheet the item belongs to, when known.
+    sheet?: string;
+}
+```
+
+`kicanvas:deselect` carries no `detail`.
+
+Example: read the selected part's MPN whenever the user clicks a footprint or
+symbol.
+
+```html
+<kicanvas-embed id="viewer" src="my-board.kicad_pcb" controls="basic">
+</kicanvas-embed>
+
+<script type="module">
+    const viewer = document.getElementById("viewer");
+
+    viewer.addEventListener("kicanvas:select", (e) => {
+        const { itemType, reference, value, fields, sheet } = e.detail;
+        console.log(`Selected ${itemType} ${reference} (${value})`);
+        console.log("MPN:", fields["MPN"] ?? "(none)");
+        console.log("Manufacturer:", fields["Manufacturer"] ?? "(none)");
+        if (sheet) {
+            console.log("On sheet:", sheet);
+        }
+    });
+
+    viewer.addEventListener("kicanvas:deselect", () => {
+        console.log("Selection cleared");
+    });
+</script>
+```
