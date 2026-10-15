@@ -4,7 +4,7 @@
     Full text available at: https://opensource.org/licenses/MIT
 */
 
-import { later } from "../../base/async";
+import { DeferredPromise, later } from "../../base/async";
 import { Logger } from "../../base/log";
 import {
     CSS,
@@ -15,8 +15,12 @@ import {
 } from "../../base/web-components";
 import { KCUIElement } from "../../kc-ui";
 import kc_ui_styles from "../../kc-ui/kc-ui.css";
-import { KiCanvasSelectEvent } from "../../viewers/base/events";
+import {
+    KiCanvasLoadEvent,
+    KiCanvasSelectEvent,
+} from "../../viewers/base/events";
 import type { Viewer } from "../../viewers/base/viewer";
+import type { SchematicViewer } from "../../viewers/schematic/viewer";
 import { Project } from "../project";
 import {
     FetchFileSystem,
@@ -31,6 +35,7 @@ import {
     KICANVAS_DESELECT_EVENT,
     KICANVAS_SELECT_EVENT,
 } from "./select-event";
+import { find_reference } from "./select-reference";
 
 const log = new Logger("kicanvas:embedtag");
 
@@ -103,6 +108,12 @@ class KiCanvasEmbedElement extends KCUIElement {
 
     #schematic_app: KCSchematicAppElement;
     #board_app: KCBoardAppElement;
+
+    /** Resolves once the project is loaded and its first page is active. */
+    #ready = new DeferredPromise<boolean>();
+
+    /** Serializes selectReference() calls so page switches don't interleave. */
+    #selecting: Promise<unknown> = Promise.resolve();
 
     override initialContentCallback() {
         this.#setup_events();
@@ -180,6 +191,7 @@ class KiCanvasEmbedElement extends KCUIElement {
             this.#setup_selection_events();
 
             this.#project.set_active_page(this.#project.root_schematic_page!);
+            this.#ready.resolve(true);
         } finally {
             this.loading = false;
         }
@@ -211,6 +223,64 @@ class KiCanvasEmbedElement extends KCUIElement {
                 this.#on_viewer_select(e.detail.item);
             }),
         );
+    }
+
+    /**
+     * Selects the schematic symbol with this reference designator (e.g.
+     * "R12") and zooms to it, switching to the sheet that shows it first.
+     * A sheet placed more than once is matched per placement. Resolves
+     * false when no schematic page shows the reference. A successful
+     * selection emits `kicanvas:select`, as a click would.
+     */
+    public selectReference(
+        reference: string,
+        opts: { zoom?: boolean } = {},
+    ): Promise<boolean> {
+        const run = this.#selecting.then(() =>
+            this.#select_reference(reference, opts.zoom ?? true),
+        );
+        this.#selecting = run.catch(() => undefined);
+        return run;
+    }
+
+    async #select_reference(reference: string, zoom: boolean) {
+        await this.#ready;
+
+        const app = this.#schematic_app;
+        const found = app ? find_reference(this.#project, reference) : null;
+        if (!app || !found) {
+            return false;
+        }
+
+        await app.viewerReady;
+        const viewer = app.viewer as SchematicViewer;
+
+        if (this.#project.active_page !== found.page) {
+            // The viewer clears its selection when a page finishes loading,
+            // so wait for that before selecting.
+            const loaded = new Promise<void>((resolve) => {
+                const listener = viewer.addEventListener(
+                    KiCanvasLoadEvent.type,
+                    () => {
+                        listener.dispose();
+                        resolve();
+                    },
+                );
+            });
+            this.#project.set_active_page(found.page);
+            await loaded;
+        } else {
+            await viewer.loaded;
+        }
+
+        viewer.select(found.uuid);
+        if (!viewer.selected) {
+            return false;
+        }
+        if (zoom) {
+            viewer.zoom_to_selection();
+        }
+        return true;
     }
 
     #on_viewer_select(item: unknown) {

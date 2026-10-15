@@ -230,3 +230,54 @@ symbol.
     });
 </script>
 ```
+
+## Methods
+
+### selectReference()
+
+`selectReference(reference, options?)` selects the schematic symbol with the
+given reference designator and zooms to it. If the symbol is on another sheet,
+the viewer switches to that sheet first. A sheet placed more than once is
+matched per placement, so `R101` opens the placement where that symbol is
+`R101` rather than the first placement of the same sheet file.
+
+```ts
+selectReference(reference: string, options?: { zoom?: boolean }): Promise<boolean>;
+```
+
+- `reference` - the reference designator, e.g. `"R12"`. Case-sensitive.
+- `options.zoom` - zoom to the selection (default `true`).
+
+It waits for the sources to finish loading, so it can be called right after
+the element is created. It resolves `true` once the symbol is selected and
+`false` when no schematic page shows that reference. Calls run one at a time
+in the order they were made.
+
+A successful call dispatches `kicanvas:select`, just as a click would. A host
+that opens a part when `kicanvas:select` fires and calls `selectReference()`
+when a part is opened elsewhere should ignore the event for the part it
+already has open.
+
+Example: a parts list beside the schematic that highlights the part you click.
+
+```html
+<kicanvas-embed id="viewer" controls="basic">
+    <kicanvas-source src="my-project.kicad_sch"></kicanvas-source>
+</kicanvas-embed>
+
+<ul id="parts">
+    <li data-ref="R12">R12 - 10k</li>
+    <li data-ref="U3">U3 - ATmega328</li>
+</ul>
+
+<script type="module">
+    const viewer = document.getElementById("viewer");
+
+    document.getElementById("parts").addEventListener("click", async (e) => {
+        const ref = e.target.closest("li")?.dataset.ref;
+        if (ref && !(await viewer.selectReference(ref))) {
+            console.warn(`${ref} is not in the schematic`);
+        }
+    });
+</script>
+```
