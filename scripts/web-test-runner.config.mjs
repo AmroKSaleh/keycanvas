@@ -5,7 +5,8 @@ import { esbuildPlugin } from "@web/dev-server-esbuild";
 // https://modern-web.dev/docs/test-runner/cli-and-configuration/
 
 export default {
-    files: "test/**/*.test.ts",
+    // Custom-element tests run under web-test-runner.elements.config.mjs.
+    files: ["test/**/*.test.ts", "!test/elements/**"],
     nodeResolve: true,
     debugger: true,
     // browsers: [
@@ -23,6 +24,7 @@ export default {
                 ".js": "ts",
                 ".glsl": "text",
                 ".css": "text",
+                ".svg": "text",
                 ".kicad_pcb": "text",
                 ".kicad_sch": "text",
                 ".kicad_wks": "text",

@@ -38,7 +38,10 @@ export abstract class Viewer extends EventTarget {
         super();
     }
 
+    #disposed = false;
+
     dispose() {
+        this.#disposed = true;
         this.disposables.dispose();
     }
 
@@ -168,7 +171,11 @@ export abstract class Viewer extends EventTarget {
         }
 
         window.requestAnimationFrame(() => {
-            this.on_draw();
+            // The element may have been removed (renderer disposed) since
+            // this frame was requested.
+            if (!this.#disposed) {
+                this.on_draw();
+            }
         });
     }
 

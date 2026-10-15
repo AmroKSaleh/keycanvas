@@ -28,7 +28,7 @@
     "scripts": {
         "test:watch": "web-test-runner --config scripts/web-test-runner.config.mjs --watch",
         "test:coverage": "web-test-runner --config scripts/web-test-runner.config.mjs --coverage",
-        "test": "web-test-runner --config scripts/web-test-runner.config.mjs",
+        "test": "web-test-runner --config scripts/web-test-runner.config.mjs && web-test-runner --config scripts/web-test-runner.elements.config.mjs",
         "lint:eslint": "eslint --config .eslintrc.cjs src/ --ext .js,.ts",
         "lint:types": "tsc -p tsconfig.json",
         "lint:prettier": "prettier . --check",

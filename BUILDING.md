@@ -67,8 +67,16 @@ After this, `npm run lint` passes cleanly.
 npm test
 ```
 
-Tests run in headless Chrome via `@web/test-runner`. All suites (including the
-selection-event unit tests in `test/kicanvas/select-event.test.ts`) should pass.
+Tests run in headless Chrome via `@web/test-runner`, in two passes:
+
+- `scripts/web-test-runner.config.mjs` runs everything except `test/elements/`
+  (parsers, painters, the selection-event and `selectReference` lookup tests).
+- `scripts/web-test-runner.elements.config.mjs` runs `test/elements/`, which
+  mount `<kicanvas-embed>` for real. These compile with `tsconfig.json`'s class
+  settings (the decorators need them) and run one page at a time, because a
+  background tab gets no animation frames.
+
+All suites should pass.
 
 To run only the selection-event tests:
 
