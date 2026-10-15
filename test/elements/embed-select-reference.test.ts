@@ -38,13 +38,17 @@ function mount(controls?: "full") {
         source("hier_child.kicad_sch", child_src),
     );
     const selected: KiCanvasSelectDetail[] = [];
+    // Every select/deselect in order, to catch a selection being cleared.
+    const events: string[] = [];
     embed.addEventListener("kicanvas:select", (e) => {
-        selected.push(
-            (e as unknown as CustomEvent<KiCanvasSelectDetail>).detail,
-        );
+        const detail = (e as unknown as CustomEvent<KiCanvasSelectDetail>)
+            .detail;
+        selected.push(detail);
+        events.push(`select ${detail.reference}`);
     });
+    embed.addEventListener("kicanvas:deselect", () => events.push("deselect"));
     document.body.append(embed);
-    return { embed, selected };
+    return { embed, selected, events };
 }
 
 suite("kicanvas.embed.selectReference", function () {
@@ -85,6 +89,19 @@ suite("kicanvas.embed.selectReference", function () {
         assert.isTrue(await embed.selectReference("R5"));
         assert.isTrue(await embed.selectReference("R101"));
         assert.equal(m.selected.at(-1)?.reference, "R101");
+    });
+
+    test("keeps the selection when called while the first sheet is still loading", async function () {
+        // Called right away, the switch to Channel B races the root sheet's
+        // first load; that load finishing must not count as the switch, or
+        // the Channel B load clears the selection afterwards.
+        const m = mount();
+        embed = m.embed;
+
+        assert.isTrue(await embed.selectReference("R101"));
+        await new Promise((r) => setTimeout(r, 500));
+
+        assert.equal(m.events.at(-1), "select R101");
     });
 
     test("resolves false for a reference that isn't in the schematic", async function () {

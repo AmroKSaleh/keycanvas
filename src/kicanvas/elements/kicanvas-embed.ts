@@ -254,6 +254,9 @@ class KiCanvasEmbedElement extends KCUIElement {
 
         await app.viewerReady;
         const viewer = app.viewer as SchematicViewer;
+        // Let the first page finish loading, so its load event isn't taken
+        // for the switch below.
+        await viewer.loaded;
 
         if (this.#project.active_page !== found.page) {
             // The viewer clears its selection when a page finishes loading,
@@ -269,8 +272,6 @@ class KiCanvasEmbedElement extends KCUIElement {
             });
             this.#project.set_active_page(found.page);
             await loaded;
-        } else {
-            await viewer.loaded;
         }
 
         viewer.select(found.uuid);
