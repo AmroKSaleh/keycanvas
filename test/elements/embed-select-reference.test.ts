@@ -26,8 +26,11 @@ function source(name: string, text: string) {
 }
 
 /** Mounts an embed with the two-placement fixture and collects its select events. */
-function mount() {
+function mount(controls?: "full") {
     const embed = document.createElement("kicanvas-embed") as Embed;
+    if (controls) {
+        embed.setAttribute("controls", controls);
+    }
     embed.style.width = "800px";
     embed.style.height = "600px";
     embed.append(
@@ -71,6 +74,17 @@ suite("kicanvas.embed.selectReference", function () {
         assert.isTrue(await embed.selectReference("R1"));
         assert.equal(m.selected.at(-1)?.reference, "R1");
         assert.equal(m.selected.at(-1)?.sheet, "Channel A");
+    });
+
+    test("switches sheets with a part selected while the full controls are shown", async function () {
+        // The symbols panel re-renders on every page load; it must not throw
+        // while the viewer clears the old selection (that left a blank canvas).
+        const m = mount("full");
+        embed = m.embed;
+
+        assert.isTrue(await embed.selectReference("R5"));
+        assert.isTrue(await embed.selectReference("R101"));
+        assert.equal(m.selected.at(-1)?.reference, "R101");
     });
 
     test("resolves false for a reference that isn't in the schematic", async function () {

@@ -55,8 +55,12 @@ export class KCBoardFootprintsPanelElement extends KCUIElement {
         // selection changes.
         this.addDisposable(
             this.viewer.addEventListener(KiCanvasSelectEvent.type, () => {
-                this.menu.selected =
-                    this.viewer.selected?.context.uuid_text ?? null;
+                // No menu while the panel re-renders (e.g. on board load).
+                const menu = this.menu as KCUIMenuElement | null;
+                if (menu) {
+                    menu.selected =
+                        this.viewer.selected?.context.uuid_text ?? null;
+                }
             }),
         );
 

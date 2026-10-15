@@ -54,8 +54,14 @@ export class KCSchematicSymbolsPanelElement extends KCUIElement {
         // selection changes.
         this.addDisposable(
             this.viewer.addEventListener(KiCanvasSelectEvent.type, () => {
+                // The list re-renders on every page load, which fires just
+                // before the viewer clears the old selection; no menu then.
+                const menu = this.menu as KCUIMenuElement | null;
+                if (!menu) {
+                    return;
+                }
                 updating_selected = true;
-                this.menu.selected = this.viewer.selected?.context.uuid ?? null;
+                menu.selected = this.viewer.selected?.context.uuid ?? null;
                 updating_selected = false;
             }),
         );
