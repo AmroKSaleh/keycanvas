@@ -15,9 +15,14 @@ import {
 } from "../../base/web-components";
 import { KCUIElement } from "../../kc-ui";
 import kc_ui_styles from "../../kc-ui/kc-ui.css";
-import { KiCanvasSelectEvent } from "../../viewers/base/events";
+import {
+    KiCanvasLoadEvent,
+    KiCanvasSelectEvent,
+} from "../../viewers/base/events";
 import type { Viewer } from "../../viewers/base/viewer";
-import { Project } from "../project";
+import { BoardViewer } from "../../viewers/board/viewer";
+import { SchematicViewer } from "../../viewers/schematic/viewer";
+import { Project, type ProjectPage } from "../project";
 import {
     FetchFileSystem,
     LocalFileSystem,
@@ -104,16 +109,202 @@ class KiCanvasEmbedElement extends KCUIElement {
     #schematic_app: KCSchematicAppElement;
     #board_app: KCBoardAppElement;
 
+    /** Apps whose viewer selection is already re-dispatched publicly. */
+    #watched_apps = new WeakSet<object>();
+
+    /** Settles when the first load from the element's sources has run. */
+    #first_load_done: () => void = () => undefined;
+    #first_load: Promise<void> = new Promise((resolve) => {
+        this.#first_load_done = resolve;
+    });
+
+    /** Reloads run one after another, never overlapping. */
+    #reload_queue: Promise<void> = Promise.resolve();
+
+    /** While true, the viewer's own select/deselect is not re-dispatched. */
+    #reloading = false;
+
+    /** The reference of the selected footprint or symbol, if any. */
+    #selected_reference: string | null = null;
+
     override initialContentCallback() {
         this.#setup_events();
-        later(() => {
-            this.#load_src();
+        later(async () => {
+            try {
+                await this.#load_src();
+            } finally {
+                this.#first_load_done();
+            }
         });
     }
 
     async #setup_events() {}
 
-    async #load_src() {
+    /**
+     * Re-read every source (the `src` attribute as it is now, and each
+     * `<kicanvas-source>`) and show the new content, keeping the camera and,
+     * when the part still exists, the selection.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public reload(): Promise<void> {
+        const run = this.#reload_queue.then(() => this.#reload());
+        // A failed reload must not wedge the ones queued after it.
+        this.#reload_queue = run.catch(() => undefined);
+        return run;
+    }
+
+    /**
+     * Select the board footprint or schematic symbol with this reference in
+     * the shown document and zoom to it. Returns false, changing nothing,
+     * when nothing is loaded or no such part is shown.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public select(reference: string): boolean {
+        return this.#select(reference, true);
+    }
+
+    /**
+     * Highlight the board net with this name and frame it. Returns false when
+     * no board is shown or the board has no such net.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public focusNet(name: string): boolean {
+        const viewer = this.#active_viewer();
+        if (!(viewer instanceof BoardViewer)) {
+            return false;
+        }
+        return viewer.focus_net(name);
+    }
+
+    async #reload() {
+        await this.#first_load;
+
+        if (!this.loaded) {
+            // The first load never produced anything; start from scratch.
+            await this.#load_src();
+            return;
+        }
+
+        const vfs = this.#make_vfs();
+        if (!vfs) {
+            return;
+        }
+
+        const active_path = this.#project.active_page?.project_path;
+        const reference = this.#selected_reference;
+
+        this.#reloading = true;
+        this.loading = true;
+        try {
+            await vfs.setup();
+            await this.#project.load(vfs);
+
+            // A document type the first load did not have needs its app.
+            if (
+                (this.#project.has_boards && !this.#board_app) ||
+                (this.#project.has_schematics && !this.#schematic_app)
+            ) {
+                await this.update();
+                this.#setup_selection_events();
+            }
+
+            const page =
+                (active_path && this.#project.page_by_path(active_path)) ||
+                this.#project.root_schematic_page ||
+                this.#project.first_page;
+
+            if (!page) {
+                return;
+            }
+
+            const app = this.#app_for(page);
+            let shown: Promise<void> = Promise.resolve();
+            if (app && app.viewerReady.resolved) {
+                const viewer = app.viewer;
+                if (
+                    viewer instanceof BoardViewer ||
+                    viewer instanceof SchematicViewer
+                ) {
+                    viewer.keep_view_on_next_load();
+                }
+                shown = this.#next_load(viewer);
+            }
+
+            this.#project.set_active_page(page);
+            await shown;
+        } finally {
+            this.#reloading = false;
+            this.loading = false;
+        }
+
+        if (reference && !this.#select(reference, false)) {
+            this.#on_viewer_select(null);
+        }
+    }
+
+    #next_load(viewer: Viewer): Promise<void> {
+        return new Promise((resolve) => {
+            const listener = viewer.addEventListener(
+                KiCanvasLoadEvent.type,
+                () => {
+                    listener.dispose();
+                    // The viewer finishes positioning in the same task that
+                    // fires load; let that task complete first.
+                    later(resolve);
+                },
+            );
+        });
+    }
+
+    #app_for(page: ProjectPage) {
+        return page.type == "pcb" ? this.#board_app : this.#schematic_app;
+    }
+
+    #active_viewer(): Viewer | null {
+        const page = this.#project.active_page;
+        if (!page || !this.loaded) {
+            return null;
+        }
+        const app = this.#app_for(page);
+        if (!app || !app.viewerReady.resolved) {
+            return null;
+        }
+        const viewer = app.viewer;
+        return viewer?.loaded.isOpen ? viewer : null;
+    }
+
+    #select(reference: string, zoom: boolean): boolean {
+        const viewer = this.#active_viewer();
+
+        if (viewer instanceof BoardViewer) {
+            const footprint = viewer.board?.find_footprint(reference);
+            if (!footprint) {
+                return false;
+            }
+            viewer.select(footprint);
+        } else if (viewer instanceof SchematicViewer) {
+            const symbol = viewer.schematic?.find_symbol(reference);
+            if (!symbol) {
+                return false;
+            }
+            viewer.select(symbol);
+            if (!viewer.selected) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        if (zoom) {
+            viewer.zoom_to_selection();
+        }
+        return true;
+    }
+
+    #make_vfs(): IFileSystem | null {
         const url_src = [];
         const inline_file = [];
 
@@ -159,11 +350,17 @@ class KiCanvasEmbedElement extends KCUIElement {
 
         if (url_vfs === null && inline_vfs === null) {
             log.warn("No valid sources specified");
-            return;
+            return null;
         }
 
-        const vfs = new MergedFileSystem([url_vfs, inline_vfs]);
-        await this.#setup_project(vfs);
+        return new MergedFileSystem([url_vfs, inline_vfs]);
+    }
+
+    async #load_src() {
+        const vfs = this.#make_vfs();
+        if (vfs) {
+            await this.#setup_project(vfs);
+        }
     }
 
     async #setup_project(vfs: IFileSystem) {
@@ -191,7 +388,8 @@ class KiCanvasEmbedElement extends KCUIElement {
      */
     #setup_selection_events() {
         for (const app of [this.#schematic_app, this.#board_app]) {
-            if (app) {
+            if (app && !this.#watched_apps.has(app)) {
+                this.#watched_apps.add(app);
                 this.#watch_app_selection(app);
             }
         }
@@ -214,8 +412,15 @@ class KiCanvasEmbedElement extends KCUIElement {
     }
 
     #on_viewer_select(item: unknown) {
+        // A reload swaps documents under the viewer, which clears and then
+        // restores the selection; the host hears only the outcome.
+        if (this.#reloading) {
+            return;
+        }
+
         // Selection was cleared.
         if (item === null || item === undefined) {
+            this.#selected_reference = null;
             this.dispatchEvent(
                 new CustomEvent(KICANVAS_DESELECT_EVENT, {
                     bubbles: true,
@@ -232,6 +437,7 @@ class KiCanvasEmbedElement extends KCUIElement {
         // Only footprints and symbols map to a public selection payload;
         // ignore other selectable items (e.g. sheets, nets).
         if (detail) {
+            this.#selected_reference = detail.reference;
             this.dispatchEvent(
                 new CustomEvent(KICANVAS_SELECT_EVENT, {
                     detail,

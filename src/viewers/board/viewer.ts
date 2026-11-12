@@ -105,6 +105,48 @@ export class BoardViewer extends DocumentViewer<
         super.select(item);
     }
 
+    /**
+     * Highlight the net with the given name and frame everything on it.
+     * Returns false when the board has no such net.
+     */
+    focus_net(name: string): boolean {
+        const net = this.board.nets.find((n) => n.name === name);
+        if (!net) {
+            return false;
+        }
+
+        const on_net = (item: unknown) => {
+            if (item instanceof board_items.Footprint) {
+                return item.pads.some((pad) => pad.net?.name === name);
+            }
+            return (
+                typeof item === "object" &&
+                item !== null &&
+                kicad_common.isNetInfo(item) &&
+                (item as { netname?: string }).netname === name
+            );
+        };
+
+        const boxes: BBox[] = [];
+        for (const layer of this.layers.in_order()) {
+            for (const [item, bbox] of layer.bboxes) {
+                if (on_net(item)) {
+                    boxes.push(bbox);
+                }
+            }
+        }
+
+        if (boxes.length > 0) {
+            const bbox = BBox.combine(boxes);
+            this.viewport.camera.bbox = bbox.grow(
+                Math.max(bbox.w, bbox.h) * 0.1 + 1,
+            );
+        }
+
+        this.highlight_net(net.number);
+        return true;
+    }
+
     highlight_net(net: number) {
         this.painter.paint_net(this.board, net);
         this.draw();

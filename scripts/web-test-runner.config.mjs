@@ -5,7 +5,8 @@ import { esbuildPlugin } from "@web/dev-server-esbuild";
 // https://modern-web.dev/docs/test-runner/cli-and-configuration/
 
 export default {
-    files: "test/**/*.test.ts",
+    // test/elements runs under its own config: web-test-runner.elements.config.mjs
+    files: ["test/**/*.test.ts", "!test/elements/**"],
     nodeResolve: true,
     debugger: true,
     // browsers: [

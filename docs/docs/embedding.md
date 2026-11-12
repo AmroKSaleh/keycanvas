@@ -230,3 +230,30 @@ symbol.
     });
 </script>
 ```
+
+## Methods
+
+These methods let a host application drive the viewer. Each one acts on the
+document currently shown.
+
+| Method                               | Does                                                                                                                                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reload(): Promise<void>`            | Re-reads every source (the `src` attribute as it is now, and each `<kicanvas-source>`) and shows the new content. The camera stays where it was, and the selected part stays selected when it still exists. Reloads queue; they never overlap. |
+| `select(reference: string): boolean` | Selects the board footprint or schematic symbol with that reference and zooms to it. Returns `false`, and changes nothing, when nothing is loaded or the shown board or sheet has no such part.                                                |
+| `focusNet(name: string): boolean`    | Highlights the board net with that name and frames it. Returns `false` when no board is shown or the board has no such net.                                                                                                                    |
+
+`reload()` dispatches no `kicanvas:select` or `kicanvas:deselect` while it swaps
+documents. When it finishes, it dispatches `kicanvas:select` with the part's
+new fields if the part is still there, or `kicanvas:deselect` if it is gone.
+`select()` dispatches `kicanvas:select` like a click does.
+
+A browser may answer a repeated request for the same URL from its cache. When
+the file behind `src` changes, give the URL a new query before reloading:
+
+```js
+const viewer = document.querySelector("kicanvas-embed");
+viewer.setAttribute("src", `my-board.kicad_pcb?t=${Date.now()}`);
+await viewer.reload();
+viewer.select("U3");
+viewer.focusNet("+3V3");
+```

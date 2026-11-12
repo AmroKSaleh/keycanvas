@@ -37,6 +37,8 @@ export abstract class DocumentViewer<
     protected painter: PainterT;
     protected grid: Grid;
 
+    #keep_view_once = false;
+
     constructor(
         canvas: HTMLCanvasElement,
         interactive: boolean,
@@ -70,9 +72,14 @@ export abstract class DocumentViewer<
             await this.viewport.ready;
             this.viewport.bounds = this.drawing_sheet.page_bbox.grow(50);
 
-            // Position the camera and draw the scene.
-            log.info("Positioning camera");
-            this.zoom_to_page();
+            // Position the camera and draw the scene, unless the host asked
+            // to keep the view because the same document was re-read.
+            if (this.#keep_view_once) {
+                this.#keep_view_once = false;
+            } else {
+                log.info("Positioning camera");
+                this.zoom_to_page();
+            }
 
             // Mark the viewer as loaded and notify event listeners
             this.resolve_loaded(true);
@@ -85,6 +92,14 @@ export abstract class DocumentViewer<
             // Draw
             this.draw();
         });
+    }
+
+    /**
+     * The next load() leaves the camera where it is instead of zooming to the
+     * page. Used when a newer copy of the shown document replaces it.
+     */
+    public keep_view_on_next_load() {
+        this.#keep_view_once = true;
     }
 
     public override paint() {
