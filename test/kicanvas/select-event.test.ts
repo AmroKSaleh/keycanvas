@@ -66,6 +66,21 @@ suite("kicanvas.select-event", function () {
         assert.equal(detail!.sheet, "Power");
     });
 
+    test("lists the nets on a footprint's pads, once each, sorted", function () {
+        const fp = make_footprint({ reference: "U1" });
+        (fp as unknown as { pads: unknown[] }).pads = [
+            { net: { number: 2, name: "VCC" } },
+            { net: { number: 1, name: "GND" } },
+            { net: { number: 1, name: "GND" } },
+            { net: { number: 0, name: "" } },
+            {},
+        ];
+
+        const detail = build_select_detail(fp);
+
+        assert.deepEqual(detail!.nets, ["GND", "VCC"]);
+    });
+
     test("maps a schematic symbol to a symbol payload", function () {
         const sym = make_symbol({
             Reference: "U1",

@@ -200,6 +200,8 @@ interface KiCanvasSelectDetail {
     fields: Record<string, string>;
     // The sheet the item belongs to, when known.
     sheet?: string;
+    // Footprints only: the names of the nets on its pads, sorted, no blanks.
+    nets?: string[];
 }
 ```
 

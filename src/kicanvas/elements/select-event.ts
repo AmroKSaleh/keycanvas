@@ -30,6 +30,8 @@ export interface KiCanvasSelectDetail {
     value: string | null;
     fields: Record<string, string>;
     sheet?: string;
+    /** Footprints only: the names of the nets on its pads, sorted, no blanks. */
+    nets?: string[];
 }
 
 /** Event name dispatched when a footprint/symbol is selected. */
@@ -68,11 +70,20 @@ export function build_select_detail(
             }
         }
 
+        const nets = new Set<string>();
+        for (const pad of item.pads ?? []) {
+            const name = non_empty(pad.net?.name);
+            if (name !== null) {
+                nets.add(name);
+            }
+        }
+
         const detail: KiCanvasSelectDetail = {
             itemType: "footprint",
             reference: non_empty(item.reference),
             value: non_empty(item.value),
             fields,
+            nets: [...nets].sort(),
         };
 
         const fp_sheet = sheet ?? non_empty(item.sheetname);
