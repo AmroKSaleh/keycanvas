@@ -143,6 +143,9 @@ export abstract class DocumentViewer<
             this.theme.grid,
             this.theme.grid_axes,
         );
+
+        // The host's pending marks, resolved against this document.
+        this.paint_pending();
     }
 
     public override zoom_to_page() {

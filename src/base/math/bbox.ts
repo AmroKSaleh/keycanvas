@@ -226,6 +226,16 @@ export class BBox {
         );
     }
 
+    /** returns true if this box and the other share any area or edge */
+    intersects(other: BBox) {
+        return (
+            this.x <= other.x2 &&
+            other.x <= this.x2 &&
+            this.y <= other.y2 &&
+            other.y <= this.y2
+        );
+    }
+
     /**
      * @returns true if the point is within the bounding box.
      */

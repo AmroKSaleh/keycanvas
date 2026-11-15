@@ -14,6 +14,9 @@ import { Color, RenderLayer } from "../../graphics";
  */
 export enum ViewLayerNames {
     overlay = ":Overlay",
+    pending = ":Pending",
+    flash = ":Flash",
+    box_select = ":BoxSelect",
     drawing_sheet = ":DrawingSheet",
     grid = ":Grid",
 }
@@ -141,6 +144,9 @@ export class ViewLayerSet implements IDisposable {
     #layer_list: ViewLayer[] = [];
     #layer_map: Map<string, ViewLayer> = new Map();
     #overlay: ViewLayer;
+    #pending: ViewLayer;
+    #flash: ViewLayer;
+    #box_select: ViewLayer;
 
     /**
      * Create a new LayerSet
@@ -153,6 +159,9 @@ export class ViewLayerSet implements IDisposable {
             false,
             Color.white,
         );
+        this.#pending = new ViewLayer(this, ViewLayerNames.pending);
+        this.#flash = new ViewLayer(this, ViewLayerNames.flash);
+        this.#box_select = new ViewLayer(this, ViewLayerNames.box_select);
     }
 
     /**
@@ -160,6 +169,9 @@ export class ViewLayerSet implements IDisposable {
      */
     dispose() {
         this.#overlay.dispose();
+        this.#pending.dispose();
+        this.#flash.dispose();
+        this.#box_select.dispose();
         for (const layer of this.#layer_list) {
             layer.dispose();
         }
@@ -189,7 +201,7 @@ export class ViewLayerSet implements IDisposable {
 
     /**
      * @yields layers in the order they should be drawn (back to front),
-     * including the overlay layer.
+     * including the host marks and the overlay layer.
      */
     *in_display_order() {
         for (let i = this.#layer_list.length - 1; i >= 0; i--) {
@@ -210,7 +222,10 @@ export class ViewLayerSet implements IDisposable {
             }
         }
 
+        yield this.#pending;
         yield this.#overlay;
+        yield this.#flash;
+        yield this.#box_select;
     }
 
     /**
@@ -237,6 +252,23 @@ export class ViewLayerSet implements IDisposable {
      */
     get overlay() {
         return this.#overlay;
+    }
+
+    /**
+     * Host marks, drawn like the overlay above the document: parts the host
+     * marked as pending (below the selection), a brief flash and the box
+     * select rubber band (above it).
+     */
+    get pending() {
+        return this.#pending;
+    }
+
+    get flash() {
+        return this.#flash;
+    }
+
+    get box_select() {
+        return this.#box_select;
     }
 
     /**

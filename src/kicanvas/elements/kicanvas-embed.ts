@@ -16,10 +16,11 @@ import {
 import { KCUIElement } from "../../kc-ui";
 import kc_ui_styles from "../../kc-ui/kc-ui.css";
 import {
+    KiCanvasBoxSelectEvent,
     KiCanvasLoadEvent,
     KiCanvasSelectEvent,
 } from "../../viewers/base/events";
-import type { Viewer } from "../../viewers/base/viewer";
+import type { PendingMark, Viewer } from "../../viewers/base/viewer";
 import { BoardViewer } from "../../viewers/board/viewer";
 import { SchematicViewer } from "../../viewers/schematic/viewer";
 import { Project, type ProjectPage } from "../project";
@@ -38,6 +39,9 @@ import {
 } from "./select-event";
 
 const log = new Logger("kicanvas:embedtag");
+
+/** Dispatched when the user draws a box with shift+drag, see boxselect. */
+const KICANVAS_BOXSELECT_EVENT = "kicanvas:boxselect";
 
 /**
  * kicanvas-embed tag
@@ -104,12 +108,16 @@ class KiCanvasEmbedElement extends KCUIElement {
     @attribute({ type: String })
     zoom: "objects" | "page" | string | null;
 
+    /** When set, shift+drag draws a box and dispatches kicanvas:boxselect. */
+    @attribute({ type: Boolean })
+    boxselect: boolean;
+
     custom_resolver: ((name: string) => URL) | null = null;
 
     #schematic_app: KCSchematicAppElement;
     #board_app: KCBoardAppElement;
 
-    /** Apps whose viewer selection is already re-dispatched publicly. */
+    /** Apps whose viewer events are already re-dispatched publicly. */
     #watched_apps = new WeakSet<object>();
 
     /** Settles when the first load from the element's sources has run. */
@@ -126,6 +134,9 @@ class KiCanvasEmbedElement extends KCUIElement {
 
     /** The reference of the selected footprint or symbol, if any. */
     #selected_reference: string | null = null;
+
+    /** The parts the host marked as pending, see setPending(). */
+    #pending: PendingMark[] = [];
 
     override initialContentCallback() {
         this.#setup_events();
@@ -177,6 +188,63 @@ class KiCanvasEmbedElement extends KCUIElement {
             return false;
         }
         return viewer.focus_net(name);
+    }
+
+    /**
+     * Outline these parts with a dashed teal line, each with its label when
+     * it has one, replacing the previous set; `[]` clears it. The set is
+     * kept: every document shown afterwards (a reload, another sheet) is
+     * marked again from it. Leaves the selection and the camera alone.
+     * Returns how many of the distinct references are on the shown document.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public setPending(items: { reference: string; label?: string }[]): number {
+        this.#pending = (items ?? [])
+            .filter((i) => typeof i?.reference === "string" && i.reference)
+            .map((i) => ({
+                reference: i.reference,
+                label: typeof i.label === "string" ? i.label : undefined,
+            }));
+
+        const active = this.#active_viewer();
+        let found = 0;
+        for (const viewer of this.#ready_viewers()) {
+            const n = viewer.set_pending(this.#pending);
+            if (viewer === active) {
+                found = n;
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Highlight these parts once, with a teal outline that fades out over
+     * about a second. Returns how many of the distinct references are on the
+     * shown document.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public flash(references: string[]): number {
+        return this.#active_viewer()?.flash(references ?? []) ?? 0;
+    }
+
+    /**
+     * Frame these parts together, without selecting them. Returns false,
+     * leaving the camera alone, when none of them is on the shown document.
+     *
+     * Public host API, see docs/embedding.md.
+     */
+    public zoomTo(references: string[]): boolean {
+        return this.#active_viewer()?.zoom_to_parts(references ?? []) ?? false;
+    }
+
+    *#ready_viewers() {
+        for (const app of [this.#schematic_app, this.#board_app]) {
+            if (app && app.viewerReady.resolved && app.viewer) {
+                yield app.viewer as Viewer;
+            }
+        }
     }
 
     async #reload() {
@@ -407,6 +475,25 @@ class KiCanvasEmbedElement extends KCUIElement {
         this.addDisposable(
             viewer.addEventListener(KiCanvasSelectEvent.type, (e) => {
                 this.#on_viewer_select(e.detail.item);
+            }),
+        );
+
+        // Host marks: the pending set made before this viewer existed, the
+        // boxselect attribute as it is at each drag, and the box's contents.
+        viewer.set_pending(this.#pending);
+        viewer.box_select_enabled = () => this.boxselect;
+        this.addDisposable(
+            viewer.addEventListener(KiCanvasBoxSelectEvent.type, (e) => {
+                this.dispatchEvent(
+                    new CustomEvent(KICANVAS_BOXSELECT_EVENT, {
+                        detail: {
+                            references: [...e.detail.references],
+                            nets: [...e.detail.nets],
+                        },
+                        bubbles: true,
+                        composed: true,
+                    }),
+                );
             }),
         );
     }

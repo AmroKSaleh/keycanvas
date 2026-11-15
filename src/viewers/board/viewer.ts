@@ -105,6 +105,29 @@ export class BoardViewer extends DocumentViewer<
         super.select(item);
     }
 
+    override find_part_bboxes(reference: string): BBox[] {
+        return (this.board?.footprints ?? [])
+            .filter((fp) => fp.reference === reference)
+            .map((fp) => fp.bbox);
+    }
+
+    protected override parts_in_box(box: BBox) {
+        const references = new Set<string>();
+        const nets = new Set<string>();
+        for (const fp of this.board?.footprints ?? []) {
+            if (!fp.reference || !fp.bbox.intersects(box)) {
+                continue;
+            }
+            references.add(fp.reference);
+            for (const pad of fp.pads) {
+                if (pad.net?.name) {
+                    nets.add(pad.net.name);
+                }
+            }
+        }
+        return { references: [...references].sort(), nets: [...nets].sort() };
+    }
+
     /**
      * Highlight the net with the given name and frame everything on it.
      * Returns false when the board has no such net.

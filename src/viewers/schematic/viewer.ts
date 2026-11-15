@@ -59,6 +59,55 @@ export class SchematicViewer extends DocumentViewer<
         return new LayerSet(this.theme);
     }
 
+    /** Every unit of a multi-unit symbol on this sheet has a box. */
+    override find_part_bboxes(reference: string): BBox[] {
+        const boxes: BBox[] = [];
+        for (const symbol of this.schematic?.symbols.values() ?? []) {
+            if (symbol.reference !== reference) {
+                continue;
+            }
+            const bbox = first(this.layers.query_item_bboxes(symbol));
+            if (bbox) {
+                boxes.push(bbox);
+            }
+        }
+        return boxes;
+    }
+
+    /**
+     * Power symbols (references starting with #) are left out. Nets here are
+     * the names of the net, global and hierarchical labels inside the box.
+     */
+    protected override parts_in_box(box: BBox) {
+        const references = new Set<string>();
+        for (const layer of this.layers.interactive_layers()) {
+            for (const [item, bbox] of layer.bboxes) {
+                if (
+                    item instanceof SchematicSymbol &&
+                    item.reference &&
+                    !item.reference.startsWith("#") &&
+                    bbox.intersects(box)
+                ) {
+                    references.add(item.reference);
+                }
+            }
+        }
+
+        const nets = new Set<string>();
+        const labels = [
+            ...this.schematic.net_labels,
+            ...this.schematic.global_labels,
+            ...this.schematic.hierarchical_labels,
+        ];
+        for (const label of labels) {
+            if (label.shown_text && box.contains_point(label.at.position)) {
+                nets.add(label.shown_text);
+            }
+        }
+
+        return { references: [...references].sort(), nets: [...nets].sort() };
+    }
+
     public override select(
         item: SchematicSymbol | SchematicSheet | string | BBox | null,
     ): void {

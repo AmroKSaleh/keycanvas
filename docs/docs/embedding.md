@@ -170,6 +170,7 @@ This example shows how to use `<kicanvas-source>` along with inline KiCad data. 
 | --------------------------- | ------------------------------------------------------------------------------------------------- |
 | `kicanvas:select`           | The user selects a footprint (board) or symbol (schematic) within the document.                   |
 | `kicanvas:deselect`         | The current selection is cleared (e.g. the user clicks empty space).                              |
+| `kicanvas:boxselect`        | With `boxselect` set, the user shift+drags a box; see [Box select](#box-select).                  |
 | ⚠️`kicanvas:click`          | The user clicks or taps within the embedded document                                              |
 | ⚠️`kicanvas:documentchange` | The currently displayed document is changed, either through user interaction or programmatically. |
 | ⚠️`kicanvas:error`          | An error occurs while loading source files                                                        |
@@ -238,11 +239,14 @@ symbol.
 These methods let a host application drive the viewer. Each one acts on the
 document currently shown.
 
-| Method                               | Does                                                                                                                                                                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reload(): Promise<void>`            | Re-reads every source (the `src` attribute as it is now, and each `<kicanvas-source>`) and shows the new content. The camera stays where it was, and the selected part stays selected when it still exists. Reloads queue; they never overlap. |
-| `select(reference: string): boolean` | Selects the board footprint or schematic symbol with that reference and zooms to it. Returns `false`, and changes nothing, when nothing is loaded or the shown board or sheet has no such part.                                                |
-| `focusNet(name: string): boolean`    | Highlights the board net with that name and frames it. Returns `false` when no board is shown or the board has no such net.                                                                                                                    |
+| Method                                                               | Does                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reload(): Promise<void>`                                            | Re-reads every source (the `src` attribute as it is now, and each `<kicanvas-source>`) and shows the new content. The camera stays where it was, and the selected part stays selected when it still exists. Reloads queue; they never overlap.                                                |
+| `select(reference: string): boolean`                                 | Selects the board footprint or schematic symbol with that reference and zooms to it. Returns `false`, and changes nothing, when nothing is loaded or the shown board or sheet has no such part.                                                                                               |
+| `focusNet(name: string): boolean`                                    | Highlights the board net with that name and frames it. Returns `false` when no board is shown or the board has no such net.                                                                                                                                                                   |
+| `setPending(items: { reference: string; label?: string }[]): number` | Outlines each listed part (board footprint, or schematic symbol on the shown sheet) with a dashed teal box, with its `label` written beside it when it has one. Replaces the previous set; `setPending([])` clears it. Returns how many of the distinct references are on the shown document. |
+| `flash(references: string[]): number`                                | Highlights the listed parts once, with a solid teal box that fades out over about a second. Returns how many of the distinct references are on the shown document.                                                                                                                            |
+| `zoomTo(references: string[]): boolean`                              | Frames the listed parts together, like `select()` frames one, without selecting them. Returns `false`, leaving the camera alone, when none of them is on the shown document.                                                                                                                  |
 
 `reload()` dispatches no `kicanvas:select` or `kicanvas:deselect` while it swaps
 documents. When it finishes, it dispatches `kicanvas:select` with the part's
@@ -258,4 +262,64 @@ viewer.setAttribute("src", `my-board.kicad_pcb?t=${Date.now()}`);
 await viewer.reload();
 viewer.select("U3");
 viewer.focusNet("+3V3");
+```
+
+### Pending marks
+
+`setPending()` is for showing work a host has staged but not yet written to
+the design files, such as a part number waiting to be applied. The set is kept
+until the next call: after `reload()`, or when another sheet is shown, the
+references are looked up again in the new document and marked where they are
+found; the others are simply not drawn. A set made before the document has
+loaded is drawn when it loads. Neither `setPending()` nor `flash()` changes the
+selection or the camera.
+
+```js
+viewer.setPending([
+    { reference: "R1", label: "MPN staged" },
+    { reference: "C4", label: "MPN staged" },
+]);
+
+// Later, once the write has landed in the file:
+await viewer.reload();
+viewer.setPending([]);
+viewer.flash(["R1", "C4"]);
+viewer.zoomTo(["R1", "C4"]);
+```
+
+### Box select
+
+With the `boxselect` attribute set (or the `boxselect` property set to
+`true`), shift+drag with the left mouse button draws a rubber band. On release,
+`<kicanvas-embed>` dispatches a bubbling, `composed` `kicanvas:boxselect`
+`CustomEvent`:
+
+```ts
+interface KiCanvasBoxSelectDetail {
+    // The references of the footprints or symbols whose bounding boxes
+    // touch the box; sorted, each once. Schematic power symbols (#PWR...)
+    // are left out.
+    references: string[];
+    // Boards: the names of the nets on those footprints' pads.
+    // Schematics: the names of the net, global and hierarchical labels
+    // inside the box. Sorted, each once, no blanks.
+    nets: string[];
+}
+```
+
+The click that ends a drag selects nothing. A shift+click that does not move
+is an ordinary click. Panning (middle or right button) and the wheel work as
+before; the attribute is read at the start of each drag, so it can be toggled
+at any time. Box select works whatever `controls` is set to, including `none`.
+
+```html
+<kicanvas-embed id="viewer" src="my-board.kicad_pcb" boxselect></kicanvas-embed>
+
+<script type="module">
+    const viewer = document.getElementById("viewer");
+    viewer.addEventListener("kicanvas:boxselect", (e) => {
+        const { references, nets } = e.detail;
+        console.log("Parts:", references, "Nets:", nets);
+    });
+</script>
 ```

@@ -44,12 +44,27 @@ export class KiCanvasMouseMoveEvent extends KiCanvasEvent<MouseMoveDetails> {
     }
 }
 
+/** The parts and nets inside a box the user drew with shift+drag. */
+export interface BoxSelectDetails {
+    references: string[];
+    nets: string[];
+}
+
+export class KiCanvasBoxSelectEvent extends KiCanvasEvent<BoxSelectDetails> {
+    static readonly type = "kicanvas:boxselect";
+
+    constructor(detail: BoxSelectDetails) {
+        super(KiCanvasBoxSelectEvent.type, detail, true);
+    }
+}
+
 // Event maps for type safe addEventListener.
 
 export interface KiCanvasEventMap {
     [KiCanvasLoadEvent.type]: KiCanvasLoadEvent;
     [KiCanvasSelectEvent.type]: KiCanvasSelectEvent;
     [KiCanvasMouseMoveEvent.type]: KiCanvasMouseMoveEvent;
+    [KiCanvasBoxSelectEvent.type]: KiCanvasBoxSelectEvent;
 }
 
 declare global {
