@@ -33,6 +33,7 @@ interface ViewerElement extends HTMLElement {
     viewer: Viewer;
     load(src: ProjectPage): Promise<void>;
     disableinteraction: boolean;
+    theme: string;
 }
 
 /**
@@ -64,6 +65,10 @@ export abstract class KCViewerAppElement<
 
     @attribute({ type: Boolean })
     sidebarcollapsed: boolean;
+
+    /** The embed's theme, handed to the viewer so it wins over saved preferences. */
+    @attribute({ type: String })
+    theme: string;
 
     override connectedCallback() {
         this.hidden = true;
@@ -199,6 +204,9 @@ export abstract class KCViewerAppElement<
 
         this.#viewer_elm = this.make_viewer_element();
         this.#viewer_elm.disableinteraction = controls == "none";
+        if (this.theme) {
+            this.#viewer_elm.theme = this.theme;
+        }
 
         let resizer = null;
 

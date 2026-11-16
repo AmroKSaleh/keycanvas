@@ -60,10 +60,12 @@ class KiCanvasEmbedElement extends KCUIElement {
                 aspect-ratio: 1.414;
                 background-color: aqua;
                 color: var(--fg);
-                font-family:
+                font-family: var(
+                    --font-text,
                     "Nunito", ui-rounded, "Hiragino Maru Gothic ProN",
                     Quicksand, Comfortaa, Manjari, "Arial Rounded MT Bold",
-                    Calibri, source-sans-pro, sans-serif;
+                    Calibri, source-sans-pro, sans-serif
+                );
                 contain: layout paint;
             }
 
@@ -544,7 +546,8 @@ class KiCanvasEmbedElement extends KCUIElement {
             this.#schematic_app = html`<kc-schematic-app
                 sidebarcollapsed
                 controls="${this.controls}"
-                controlslist="${this.controlslist}">
+                controlslist="${this.controlslist}"
+                theme="${this.theme ?? ""}">
             </kc-schematic-app>` as KCSchematicAppElement;
         }
 
@@ -552,7 +555,8 @@ class KiCanvasEmbedElement extends KCUIElement {
             this.#board_app = html`<kc-board-app
                 sidebarcollapsed
                 controls="${this.controls}"
-                controlslist="${this.controlslist}">
+                controlslist="${this.controlslist}"
+                theme="${this.theme ?? ""}">
             </kc-board-app>` as KCBoardAppElement;
         }
 

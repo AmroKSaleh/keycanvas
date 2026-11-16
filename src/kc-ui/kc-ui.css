@@ -207,6 +207,128 @@
 }
 
 /*
+    KeyHub UI kit (2026-11-16). Inside KeyHub Desktop the page defines the kit's
+    tokens (@keylife/tokens: --surface, --text, --accent ...) and they inherit
+    into these shadow roots, so the chrome follows the app's light and dark
+    themes. Outside KeyHub the fallbacks keep KiCanvas's own colours. Later in
+    the file than the gradient theme, so it wins.
+*/
+:host {
+    --bg: var(--surface-sunken, #131218);
+    --fg: var(--text, #f8f8f0);
+
+    --tooltip-bg: var(--inverse-surface, #8864cb);
+    --tooltip-fg: var(--inverse-text, #f8f8f0);
+    --tooltip-border: 1px solid var(--border, #131218);
+
+    --scrollbar-bg: transparent;
+    --scrollbar-fg: var(--border-strong, #ae81ff66);
+    --scrollbar-hover-fg: var(--border-control, #ae81ffbb);
+    --scrollbar-active-fg: var(--accent, #ae81ff);
+
+    --activity-bar-bg: var(--surface, #282634);
+    --activity-bar-fg: var(--text-secondary, #f8f8f0);
+    --activity-bar-active-bg: var(--selected, #131218);
+    --activity-bar-active-fg: var(--text, #f8f8f0);
+
+    --resizer-bg: var(--border, #ae81ff);
+    --resizer-active-bg: var(--accent, #ae81ffbb);
+
+    --panel-bg: var(--surface, #131218);
+    --panel-fg: var(--text, #f8f8f0);
+    --panel-border: 1px solid var(--border, #282634);
+    --panel-title-bg: var(--surface-sunken, #8077a8);
+    --panel-title-fg: var(--text, #f8f8f0);
+    --panel-title-border: 1px solid var(--border, #634e89);
+    --panel-title-button-bg: transparent;
+    --panel-title-button-fg: var(--text-secondary, #dcc8ff);
+    --panel-title-button-hover-bg: var(--selected, #ae81ff);
+    --panel-title-button-hover-fg: var(--text, inherit);
+    --panel-title-button-disabled-bg: inherit;
+    --panel-title-button-disabled-fg: var(--text-muted, #888);
+    --panel-subtitle-bg: var(--surface-sunken, #634e89);
+    --panel-subtitle-fg: var(--text-secondary, var(--panel-fg));
+
+    --dropdown-bg: var(--surface, #464258);
+    --dropdown-fg: var(--text, #f8f8f0);
+    --dropdown-hover-bg: var(--selected, #ae81ff);
+    --dropdown-hover-fg: var(--text, #f8f8f0);
+    --dropdown-active-bg: var(--selected, #131218);
+    --dropdown-active-fg: var(--text, #f8f8f0);
+
+    --button-bg: var(--primary, #81eeff);
+    --button-fg: var(--primary-text, #131218);
+    --button-hover-bg: var(--accent, #a3f3ff);
+    --button-hover-fg: var(--primary-text, #131218);
+    --button-focus-outline: 2px solid var(--focus, #ae81ff);
+    --button-selected-bg: var(--selected, #ae81ff);
+    --button-selected-fg: var(--text, #131218);
+    --button-disabled-bg: var(--surface-sunken, #131218);
+    --button-disabled-fg: var(--text-muted, #888);
+    --button-success-bg: var(--success-solid, #64cb96);
+    --button-success-fg: var(--success-solid-text, #131218);
+    --button-success-hover-bg: var(--success-fg, #81ffbe);
+    --button-success-hover-fg: var(--success-solid-text, #131218);
+    --button-danger-bg: var(--danger-solid, #cb6488);
+    --button-danger-fg: var(--danger-solid-text, #131218);
+    --button-danger-hover-bg: var(--danger-fg, #ff81ad);
+    --button-danger-hover-fg: var(--danger-solid-text, #131218);
+    --button-outline-bg: var(--surface, #282634);
+    --button-outline-fg: var(--text, #f8f8f0);
+    --button-outline-hover-bg: var(--selected, #282634);
+    --button-outline-hover-fg: var(--accent-text, #81eeff);
+    --button-outline-disabled-bg: var(--surface-sunken, #131218);
+    --button-outline-disabled-fg: var(--text-muted, #888);
+    --button-toolbar-bg: var(--surface, #282634);
+    --button-toolbar-fg: var(--text-secondary, #f8f8f0);
+    --button-toolbar-hover-bg: var(--selected, #282634);
+    --button-toolbar-hover-fg: var(--text, #81eeff);
+    --button-toolbar-disabled-bg: var(--surface, #131218);
+    --button-toolbar-disabled-fg: var(--text-muted, #888);
+    --button-toolbar-alt-bg: var(--surface-sunken, #282634);
+    --button-toolbar-alt-hover-bg: var(--selected, #282634);
+    --button-toolbar-alt-hover-fg: var(--text, #f8f8f0);
+    --button-toolbar-alt-disabled-bg: var(--surface, #131218);
+    --button-menu-bg: transparent;
+    --button-menu-fg: var(--text, #f8f8f0);
+    --button-menu-hover-bg: var(--selected, transparent);
+    --button-menu-hover-fg: var(--text, #81eeff);
+    --button-menu-disabled-bg: transparent;
+    --button-menu-disabled-fg: var(--text-muted, #888);
+
+    --input-bg: var(--surface, #131218);
+    --input-fg: var(--text, #f8f8f0);
+    --input-border: 1px solid var(--border-control, #8077a8);
+    --input-accent: var(--accent, #ae81ff);
+    --input-focus-outline: 2px solid var(--focus, #ae81ff);
+    --input-placeholder: var(--text-muted, #8077a8);
+    --input-disabled-bg: var(--surface-sunken, #131218);
+    --input-disabled-fg: var(--text-muted, #888);
+
+    --input-range-bg: var(--border-strong, #8077a8);
+    --input-range-fg: var(--accent, #f8f8f0);
+    --input-range-hover-bg: var(--accent, #ae81ff);
+    --input-range-disabled-bg: var(--surface-sunken, #131218);
+
+    --list-item-bg: var(--panel-bg);
+    --list-item-fg: var(--panel-fg);
+    --list-item-active-bg: var(--selected, #634e89);
+    --list-item-active-fg: var(--text, var(--list-item-fg));
+    --list-item-hover-bg: var(--surface-sunken, #64cb96);
+    --list-item-hover-fg: var(--text, var(--list-item-bg));
+    --list-item-disabled-bg: var(--list-item-bg);
+    --list-item-disabled-fg: var(--text-muted, #888);
+
+    --grid-outline: var(--border, #433e56);
+
+    --focus-overlay-bg: var(--surface, #8077a8);
+    --focus-overlay-opacity: 0.6;
+    --focus-overlay-fg: var(--text, #f8f8f0);
+
+    font-family: var(--font-text, inherit);
+}
+
+/*
     Scrollbar
 */
 
